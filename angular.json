@@ -3,5 +3,50 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
+    "ngx-simple-indexeddb": {
+      "projectType": "library",
+      "root": "projects/ngx-simple-indexeddb",
+      "sourceRoot": "projects/ngx-simple-indexeddb/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "options": {
+            "project": "projects/ngx-simple-indexeddb/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/ngx-simple-indexeddb/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/ngx-simple-indexeddb/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "main": "projects/ngx-simple-indexeddb/src/test.ts",
+            "tsConfig": "projects/ngx-simple-indexeddb/tsconfig.spec.json",
+            "karmaConfig": "projects/ngx-simple-indexeddb/karma.conf.js"
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "projects/ngx-simple-indexeddb/**/*.ts",
+              "projects/ngx-simple-indexeddb/**/*.html"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "cli": {
+    "schematicCollections": [
+      "@angular-eslint/schematics"
+    ]
   }
 }
