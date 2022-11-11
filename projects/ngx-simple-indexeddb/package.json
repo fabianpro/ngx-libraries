@@ -1,6 +1,6 @@
 {
   "name": "ngx-simple-indexeddb",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "This library try to give you a way more easy to use Indexeddb, enjoy it",
   "keywords": ["indexedb", "storage", "browser storage", "localstorage"],
   "author": {

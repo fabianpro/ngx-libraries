@@ -1,6 +1,6 @@
 # NGX-SIMPLE-INDEXEDDB
 
-This library aims to give you one better way to implement IndexedDB and more easy
+This library aims to give you one better way to implement IndexedDB in ***Angular*** and more easy
 
 ## Install
 ```

@@ -8,7 +8,7 @@ import { IndexedDBConfig } from './ngx-simple-indexeddb.module';
 })
 export class NgxSimpleIndexeddbService extends IndexedDBStorage {
 
-  private subject = new Subject<any>();
+  private subject = new Subject<ResponseStorageIndexedDB>();
   
   constructor(config: IndexedDBConfig) { 
     super(config.dbName, config.dbVersion);
