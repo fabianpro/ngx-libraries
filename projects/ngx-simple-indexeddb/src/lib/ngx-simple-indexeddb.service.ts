@@ -1,11 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Subject, Observable } from 'rxjs';
-import { IndexedDBStorage, IndexObj } from './indexdb-storage';
-
-export interface ResponseStorageIndexedDB {
-  event: string;
-  data: any;
-}
+import { IndexedDBStorage, IndexObj, ResponseStorageIndexedDB } from './indexdb-storage';
+import { IndexedDBConfig } from './ngx-simple-indexeddb.module';
 
 @Injectable({
   providedIn: 'root'
@@ -14,19 +10,21 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
 
   private subject = new Subject<any>();
   
-  constructor() { 
-    super('TEST', 3);
+  constructor(config: IndexedDBConfig) { 
+    super(config.dbName, config.dbVersion);
   }
 
-  get messagesData(): Observable<ResponseStorageIndexedDB> {
-    return this.subject;
+  get transactionsMessagesObs(): Observable<ResponseStorageIndexedDB> {
+    return this.subject.asObservable();
   } 
 
-  messagesDB(data: any, args: any) {
+  transactionsMessages(func: string, event: any, data: any) {
     this.subject.next({
-			event: data,
-			args: args
+      func: func,
+			event: event,
+			data: data
 		});
+    this.subject.complete();
   }
 
   addItems(storage: string, data: any, indexes: IndexObj[] = [], autoIncrement = true) {
@@ -37,8 +35,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
     this.get(storage, key, index);
   }
 
-  getItems(storage: string) {
-    this.getAll(storage);
+  getItems(storage: string, withKeys: boolean = false) {
+    this.getAll(storage, withKeys);
   }
 
   updateItem(storage: string, key: string | number, newValue: any) {
@@ -49,7 +47,11 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
     this.delete(storage, key);
   }
 
-  removeDB(nameDB: string) {
-    this.deleteBD(nameDB);
+  clearObjStorage(storage: string) {
+    this.clearObjectStorage(storage);
+  }
+
+  removeDB() {
+    this.deleteBD();
   }
 }

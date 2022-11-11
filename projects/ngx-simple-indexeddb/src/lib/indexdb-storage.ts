@@ -1,5 +1,11 @@
-import { Injectable } from '@angular/core';
-import { EMPTY, Observable, Subject } from 'rxjs';
+const NOT_AVAILABLE_DB = 'IndexedDB not available';
+const INVALID_PARAMETERS = 'Invalid parameters';
+
+export interface ResponseStorageIndexedDB {
+  func: string,
+  event: string;
+  data: any;
+}
 
 export interface IndexObj {
   id?: string;
@@ -20,59 +26,91 @@ export abstract class IndexedDBStorage {
     this.versionDB = version;
   }
 
-  protected abstract messagesDB(data: any, ...args: any[]): any;
+  protected abstract transactionsMessages(func: string, event: string, data: any): void;
 
-  private handleSuccess(e: any) {
-    this.messagesDB('onSuccess', e);
+  private handleSuccess(func: string, data: any) {
+    this.transactionsMessages(func, 'onSuccess', data);
   }
 
-  private handleError(e: any) {
-    this.messagesDB('onError', e);
+  private handleError(func: string, data: any) {
+    this.transactionsMessages(func, 'onError', data);
   }
 
   private getConnection() {
-    const request = window.indexedDB.open(this.nameDB, this.versionDB);
+    const NAME_METHOD = this.getConnection.name;
+    const indexedDB = window.hasOwnProperty('indexedDB') && window.indexedDB ? window.indexedDB : null;
+    if (!indexedDB) {
+      this.handleError(NAME_METHOD, NOT_AVAILABLE_DB);
+      return;
+    };
+
+    const request = indexedDB.open(this.nameDB, this.versionDB);
+    request.onblocked = (e: any) => this.handleSuccess(NAME_METHOD, e);
+    request.onerror = (e: any) => this.handleError(NAME_METHOD, e);
     return request;
   }
 
-  protected deleteBD(nameDB: string) {
-    const request = window.indexedDB.deleteDatabase(nameDB);
-    request.onsuccess = (e) => this.handleSuccess(e);
+  protected deleteBD() {
+    const NAME_METHOD = this.deleteBD.name;
+    const request = window.indexedDB.deleteDatabase(this.nameDB);
+    request.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e);
   }
 
-  protected add(nameStore: string, data: any,
-    { autoIncrement, indexes }: { autoIncrement: boolean, indexes: IndexObj[] } = { autoIncrement: true, indexes: [] }) {
+  protected add(nameStore: string, data: any, { autoIncrement, indexes }: { autoIncrement: boolean, indexes: IndexObj[] } = { autoIncrement: true, indexes: [] }) {
+    const NAME_METHOD = this.add.name;
     if (!nameStore || !data) {
-      this.handleError('Parameters invalid');
+      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
       return;
     }
 
     const request = this.getConnection();
-    request.onupgradeneeded = (event: any) => {
-      const store = event.target.result.createObjectStore(nameStore, { autoIncrement: autoIncrement });
-      if (indexes?.length)
-        for (let item of indexes)
-          store.createIndex(item.id, item.name, { unique: item.unique });
+    request!.onsuccess = (event: any) => {
+      const db = event.target.result;
+      
+      if (db.objectStoreNames.contains(nameStore)) {
+        const tx = db.transaction(nameStore, 'readwrite');
+        const store = tx.objectStore(nameStore);      
 
-      let createRequest;
-      if (Array.isArray(data))
-        for (let item of data) createRequest = store.put(item);
-      else createRequest = store.put(data);
+        let createRequest;
+        if (Array.isArray(data))
+          for (let item of data) createRequest = store.put(item);
+        else createRequest = store.put(data);
 
-      createRequest.onsuccess = (e: any) => this.handleSuccess(e.target.result);
-      createRequest.onerror = (e: any) => this.handleError(e);
+        createRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
+        createRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
+      }
     }
-    request.onerror = (e: any) => this.handleError(e);
+
+    request!.onupgradeneeded = (event: any) => {
+      const db = event.target.result;
+            
+      if (!db.objectStoreNames.contains(nameStore)) {
+        const store = db.createObjectStore(nameStore, { autoIncrement: autoIncrement });      
+
+        if (indexes?.length)
+          for (let item of indexes)
+            store.createIndex(item.id, item.name, { unique: item.unique });
+
+        let createRequest;
+        if (Array.isArray(data))
+          for (let item of data) createRequest = store.put(item);
+        else createRequest = store.put(data);
+
+        createRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
+        createRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
+      }
+    }
   }
 
   protected get(nameStore: string, key: string | number, nameIndex?: string) {
-    if (!key) {
-      this.handleError('Parameters invalid');
+    const NAME_METHOD = this.get.name;
+    if (!nameStore || !key) {
+      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
       return;
     }
 
     const request = this.getConnection();
-    request.onsuccess = (event: any) => {
+    request!.onsuccess = (event: any) => {
       const tx = event.target.result.transaction(nameStore, 'readonly');
       const store = tx.objectStore(nameStore);
       let request;
@@ -80,62 +118,84 @@ export abstract class IndexedDBStorage {
         const index = store.index(nameIndex);
         request = index.get(key);
       } else request = store.get(key);
-
-      store.openCursor().onsuccess = (e: any) => {
-        const data = e.target.result;
-        this.handleSuccess({
-          primaryKey: data.primaryKey,
-          data: data.value
-        });
-      }
-      request.onsuccess = (e: any) => this.handleSuccess(e.target.result);
-      request.onerror = (e: any) => this.handleError(e);
+      request.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
     }
-    request.onerror = (e: any) => this.handleError(e);
   }
 
-  protected getAll(nameStore: string, strategyTransaction: string = 'readonly') {
+  protected getAll(nameStore: string, withKeys: boolean = false) {
+    const NAME_METHOD = this.getAll.name;
+    if (!nameStore) {
+      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
+      return;
+    }
+
     const request = this.getConnection();
-    request.onsuccess = (event: any) => {
-      const tx = event.target.result.transaction(nameStore, strategyTransaction);
+    request!.onsuccess = (event: any) => {
+      const data: any = [];
+      const tx = event.target.result.transaction(nameStore, 'readonly');
       const store = tx.objectStore(nameStore);
-      store.getAll().onsuccess = (e: any) => this.handleSuccess(e.target.result);
+
+      if (withKeys) {
+        store.openCursor().onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            data.push({ id: cursor.key, value: cursor.value });
+            cursor.continue();
+          } else
+            this.handleSuccess(NAME_METHOD, data);
+        };
+      } else
+        store.getAll().onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
+      store.getAll().onerror = (e: any) => this.handleError(NAME_METHOD, e);
     };
   }
 
   protected update(nameStore: string, key: string | number, newValue: any) {
-    if (!key || !newValue) {
-      this.handleError('Parameters invalid');
+    const NAME_METHOD = this.update.name;
+    if (!nameStore || !key || !newValue) {
+      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
       return;
     }
 
     const request = this.getConnection();
-    request.onsuccess = (event: any) => {
+    request!.onsuccess = (event: any) => {
       const tx = event.target.result.transaction(nameStore, 'readwrite');
       const store = tx.objectStore(nameStore);
       const updateRequest = store.put(newValue, key);
-      updateRequest.onsuccess = (e: any) => this.handleSuccess(e.target.result);
-      updateRequest.onerror = (e: any) => this.handleError(e);
+      updateRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
+      updateRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
     }
-    request.onerror = (e: any) => this.handleError(e);
   }
 
   protected delete(nameStore: string, key: string | number) {
-    if (!key) {
-      this.handleError('Parameters invalid');
+    const NAME_METHOD = this.delete.name;
+    if (!nameStore || !key) {
+      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
       return;
     }
 
     const request = this.getConnection();
-    request.onsuccess = (event: any) => {
+    request!.onsuccess = (event: any) => {
       const tx = event.target.result.transaction(nameStore, 'readwrite');
       const deleteRequest = tx.objectStore(nameStore).delete(key);
-      deleteRequest.onsuccess = (e: any) => this.handleSuccess(e.target.result);
-      deleteRequest.onerror = (e: any) => this.handleError(e);
+      deleteRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
+      deleteRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
     }
-    request.onerror = (e: any) => this.handleError(e);
   }
 
+  protected clearObjectStorage(nameStore: string) {
+    const NAME_METHOD = this.clearObjectStorage.name;
+    if (!nameStore) {
+      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
+      return;
+    }
+
+    const request = this.getConnection();
+    request!.onsuccess = (event: any) => {
+      const tx = event.target.result.transaction(nameStore, 'readwrite');
+      const deleteRequest = tx.objectStore(nameStore).clear();
+      deleteRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
+      deleteRequest.onerror = (e: any)=> this.handleError(NAME_METHOD, e);
+    }    
+  }
 }
-
-

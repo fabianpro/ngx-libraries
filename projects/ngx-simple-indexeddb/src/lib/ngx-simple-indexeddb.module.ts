@@ -1,19 +1,21 @@
-import { NgModule } from '@angular/core';
-import { NgxSimpleIndexeddbComponent } from './ngx-simple-indexeddb.component';
-import { NgxSimpleIndexeddbService } from './ngx-simple-indexeddb.service';
+import { ModuleWithProviders, NgModule } from '@angular/core';
 
+@NgModule()
+export class NgxSimpleIndexeddbModule {
+  static forRoot(config: IndexedDBConfig): ModuleWithProviders<NgxSimpleIndexeddbModule> {
+    return {
+      ngModule: NgxSimpleIndexeddbModule,
+      providers: [
+        {
+          provide: IndexedDBConfig,
+          useFactory: () => config
+        }
+      ],
+    };
+  }
+}
 
-@NgModule({
-  declarations: [
-    NgxSimpleIndexeddbComponent
-  ],
-  imports: [
-  ],
-  exports: [
-    NgxSimpleIndexeddbComponent
-  ],
-  providers: [
-    NgxSimpleIndexeddbService
-  ]
-})
-export class NgxSimpleIndexeddbModule { }
+export class IndexedDBConfig {
+  dbName!: string;
+  dbVersion!: number;
+}
