@@ -28,10 +28,6 @@ describe('NgxSimpleIndexeddbService', () => {
     expect(service).toBeTruthy();
   });
 
-  //it('#getObservable messages', (done: DoneFn) => {
-    //Not implemented
-  //});
-
   it('should add Items to IndexedDB', () => {
     const indexes = [
       { id: 'by_name', name: 'name', unique: true },
