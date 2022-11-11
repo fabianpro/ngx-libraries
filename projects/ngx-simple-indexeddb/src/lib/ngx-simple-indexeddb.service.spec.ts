@@ -28,21 +28,6 @@ describe('NgxSimpleIndexeddbService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('#getObservable messages', (done: DoneFn) => {
-    //var subject = new BehaviorSubject('staltz');
-    //spyOn(service, 'transactionsMessagesObs').and.returnValue(of("success"));
-    /*service.transactionsMessagesObs.subscribe((result) => {
-      // verify results
-      console.log(result);
-      done();
-    });*/
-
-    /*service.transactionsMessagesObs.subscribe(data => {
-      expect(data).toBe({ func: 'add', event: 'onSuccess', data: 2 });
-      done();
-    });*/
-  });
-
   it('should add Items to IndexedDB', () => {
     const indexes = [
       { id: 'by_name', name: 'name', unique: true },
