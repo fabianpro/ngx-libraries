@@ -1,21 +1,20 @@
 import { ModuleWithProviders, NgModule } from '@angular/core';
+import { IDBSchema, SCHEMA_TOKEN } from './indexdb-meta-models';
+import { NgxSimpleIndexeddbService } from './ngx-simple-indexeddb.service';
 
 @NgModule()
 export class NgxSimpleIndexeddbModule {
-  static forRoot(config: IndexedDBConfig): ModuleWithProviders<NgxSimpleIndexeddbModule> {
+  static forRoot(schemas: IDBSchema[]): ModuleWithProviders<NgxSimpleIndexeddbModule> {
     return {
       ngModule: NgxSimpleIndexeddbModule,
-      providers: [
-        {
-          provide: IndexedDBConfig,
-          useFactory: () => config
+      providers: [        
+        NgxSimpleIndexeddbService, 
+        { 
+          provide: SCHEMA_TOKEN, 
+          useValue: schemas 
         }
       ],
     };
   }
 }
 
-export class IndexedDBConfig {
-  dbName!: string;
-  dbVersion!: number;
-}

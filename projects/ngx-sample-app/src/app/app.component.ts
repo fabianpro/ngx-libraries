@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { NgxSimpleIndexeddbService } from 'ngx-simple-indexeddb';
+import { NgxSimpleIndexeddbService } from 'projects/ngx-simple-indexeddb/src/public-api';
 
 @Component({
   selector: 'app-root',
@@ -9,58 +9,124 @@ import { NgxSimpleIndexeddbService } from 'ngx-simple-indexeddb';
 export class AppComponent {
 
   index: number = 0;
+  response: any;
+  loading: boolean = false;
 
   constructor(
-    private _ngxSimpleIndexedDB: NgxSimpleIndexeddbService
+    private _sIDB: NgxSimpleIndexeddbService
   ) { }
 
   ngOnInit(): void {
-    this._ngxSimpleIndexedDB.transactionsMessagesObs.subscribe(res => console.log(res));
-  }  
-
+    this._sIDB.eventsIndexedObs.subscribe(res => console.log(res));
+  }
+  
   saveData() {
-    this._ngxSimpleIndexedDB.addItems('TMP_NOT_INDEXED', {name: 'Person', age: 33});
+    this.loading = true;
+    const data = { pk: 1, name: 'C#' };
+    this._sIDB.addRecords('BD1', 'languages', data)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
   }
 
   saveGeneratedData() {
-    const indexes = [
-      {id: 'by_name', name: 'name', unique: true}, 
-      {id: 'by_age', name: 'age', unique: true}
-    ];
     const data = [];
-    for (let i = this.index; i < this.index + 5; i++) 
-      data.push({age: i, name: 'Person' + i});
-    this._ngxSimpleIndexedDB.addItems('TMP_INDEXED', data, indexes, true);
-    this.index =+ 5;
-  }
-  
-  getData() {
-    this._ngxSimpleIndexedDB.getItem('TMP_INDEXED', 2);
+    for (let i = this.index; i < this.index + 5; i++)
+      data.push({ pk: i + 1, name: `Company ${i + 1}`, antique: i + 5 });
 
-    setTimeout(() => {
-      this._ngxSimpleIndexedDB.getItem('TMP_INDEXED', 'Person', 'by_name');
-    }, 2000);   
+    this._sIDB.addRecords('BD1', 'companies', data)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+    this.index = + 5;
   }
-  
+
+  getDataById() {
+    this._sIDB.getRecord('BD1', 'companies', 2)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
+
+  getDataByIndexName() {
+    this._sIDB.getRecord('BD1', 'companies', 'Company 4', 'name')
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
   getAllData() {
-    this._ngxSimpleIndexedDB.getItems('TMP_INDEXED', true);
-  }
-  
-  updateData() {    
-    const data = [{name: 'Person', age: 35}];
-    this._ngxSimpleIndexedDB.updateItem('TMP_INDEXED', 'Person', data);    
-  }
-  
-  deleteData() {
-    this._ngxSimpleIndexedDB.deleteItem('TMP_INDEXED', 2);
+    this._sIDB.getRecords('BD1', 'companies', true)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
   }
 
-  clearObjectStorage() {
-    this._ngxSimpleIndexedDB.clearObjStorage('TMP_INDEXED');
+  updateData() {
+    const data = { name: 'Company xxx', age: 35 };
+    //this._sIDB.updateItem('BD1', 'companies', 'Person 0', data)
+    this._sIDB.updateRecord('BD1', 'companies', 2, data)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
   }
-  
+
+  deleteData() {
+    this._sIDB.deleteRecord('BD1', 'companies', 3)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
+  countData() {
+    this._sIDB.countRecords('BD1', 'companies')
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
+  clearObjectStore() {
+    this._sIDB.clearObjStore('BD1', 'companies')
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
+  deleteObjectStore() {
+    this._sIDB.deleteObjStore('BD1', 'languages')
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
   deleteBD() {
-    this._ngxSimpleIndexedDB.removeDB();
+    this._sIDB.removeDB('BD1')
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
   }
 
 }

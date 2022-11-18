@@ -42,4 +42,4 @@ testem.log
 Thumbs.db
 
 # Personal files
-README.md
+/README.md

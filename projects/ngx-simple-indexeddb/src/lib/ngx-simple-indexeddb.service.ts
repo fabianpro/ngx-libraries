@@ -1,57 +1,225 @@
-import { Injectable } from '@angular/core';
-import { Subject, Observable } from 'rxjs';
-import { IndexedDBStorage, IndexObj, ResponseStorageIndexedDB } from './indexdb-storage';
-import { IndexedDBConfig } from './ngx-simple-indexeddb.module';
+import { Inject, Injectable } from '@angular/core';
+import { Observable, Subject } from 'rxjs';
+import { IDBSchema, ResponseStoreIndexedDB, SCHEMA_TOKEN } from './indexdb-meta-models';
+import { IndexedDBStorage } from './indexdb-storage';
 
 @Injectable({
   providedIn: 'root'
 })
 export class NgxSimpleIndexeddbService extends IndexedDBStorage {
 
-  private subject = new Subject<ResponseStorageIndexedDB>();
+  private subject = new Subject<ResponseStoreIndexedDB>();
   
-  constructor(config: IndexedDBConfig) { 
-    super(config.dbName, config.dbVersion);
+  constructor(
+    @Inject(SCHEMA_TOKEN) databases: IDBSchema[]
+  ) {
+    if (!databases.length) 
+      throw new Error('Please, provide databases schema');
+
+    const map = new Map<string, IDBSchema>(); 
+    for (let item of databases) 
+      map.set(item.dbName, item);    
+    super(map);
   }
 
-  get transactionsMessagesObs(): Observable<ResponseStorageIndexedDB> {
+  get eventsIndexedObs(): Observable<ResponseStoreIndexedDB> {
     return this.subject.asObservable();
-  } 
-
-  transactionsMessages(func: string, event: any, data: any) {
-    this.subject.next({
-      func: func,
+  }
+ 
+  eventsIndexedDB(event: string, dbName: string, storeName?: string, data?: any): void {
+    if (!this.subject) return;
+    this.subject.next({      
 			event: event,
-			data: data
+			dbName: dbName,
+      storeName: storeName,
+      data: data
 		});
     this.subject.complete();
   }
 
-  addItems(storage: string, data: any, indexes: IndexObj[] = [], autoIncrement = true) {
-    this.add(storage, data, {indexes: indexes, autoIncrement: autoIncrement});
+  /**
+   * Method to add records in database
+   * @param database 
+   * @param storeName 
+   * @param data 
+   * @returns 
+   */
+  addRecords(database: string, storeName: string, data: any): Observable<any> {
+    return new Observable<any>((obs) => {
+      this.addItems(database, storeName, data)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    });    
   }
 
-  getItem(storage: string, key: string | number, index?: string) {
-    this.get(storage, key, index);
+  /**
+   * Add records in store
+   * @param database 
+   * @param storeName 
+   * @param key 
+   * @param indexName 
+   * @returns 
+   */
+  getRecord(database: string, storeName: string, key: string | number, indexName?: string): Observable<any> {    
+    return new Observable<any>((obs) => {
+      this.getItem(database, storeName, key, indexName)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    });  
   }
 
-  getItems(storage: string, withKeys: boolean = false) {
-    this.getAll(storage, withKeys);
+  /**
+   * Get list records of store
+   * @param database 
+   * @param storeName 
+   * @param withKeys 
+   * @returns 
+   */
+  getRecords(database: string, storeName: string, withKeys: boolean = false): Observable<any> {
+    return new Observable<any>((obs) => {
+      this.getAllItems(database, storeName, withKeys)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    }); 
   }
 
-  updateItem(storage: string, key: string | number, newValue: any) {
-    this.update(storage, key, newValue);
+  /**
+   * Update record of store
+   * @param database 
+   * @param storeName 
+   * @param key 
+   * @param newValue 
+   * @returns 
+   */
+  updateRecord(database: string, storeName: string, key: string | number, newValue: any): Observable<any> {    
+    return new Observable<any>((obs) => {
+      this.updateItem(database, storeName, key, newValue)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    }); 
   }
 
-  deleteItem(storage: string, key: string | number) {
-    this.delete(storage, key);
+  /**
+   * Delete record of store
+   * @param database 
+   * @param storeName 
+   * @param key 
+   * @returns 
+   */
+  deleteRecord(database: string, storeName: string, key: string | number): Observable<any> {  
+    return new Observable<any>((obs) => {
+      this.deleteItem(database, storeName, key)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    }); 
   }
 
-  clearObjStorage(storage: string) {
-    this.clearObjectStorage(storage);
+  /**
+   * Count records of store
+   * @param database 
+   * @param storeName 
+   * @returns 
+   */
+  countRecords(database: string, storeName: string): Observable<number>{    
+    return new Observable<any>((obs) => {
+      this.countItems(database, storeName)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    }); 
   }
 
-  removeDB() {
-    this.deleteBD();
+  /**
+   * Clear all data of store
+   * @param database 
+   * @param storeName 
+   * @returns 
+   */
+  clearObjStore(database: string, storeName: string) {
+    return new Observable<any>((obs) => {
+      this.clearStore(database, storeName)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    }); 
+  }
+
+  /**
+   * Delete object store
+   * @param database 
+   * @param storeName 
+   * @returns 
+   */
+  deleteObjStore(database: string, storeName: string) {
+    return new Observable<any>((obs) => {
+      this.deleteObjectStore(database, storeName)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });      
+    });
+  }
+
+  /**
+   * Delete or remove database
+   * @param database 
+   * @returns 
+   */
+  removeDB(database: string) {
+    return new Observable<any>((obs) => {
+      this.deleteBD(database)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });  
+    }); 
   }
 }

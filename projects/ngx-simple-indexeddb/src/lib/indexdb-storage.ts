@@ -1,201 +1,323 @@
+import { connectDatabase, createDatabaseAndObjectsStore, deleteObjectStore } from "../utils/database";
+import { createTx, TXMode, getPK, existStore } from "../utils/transactions";
+import { IDBSchema } from "./indexdb-meta-models";
+
 const NOT_AVAILABLE_DB = 'IndexedDB not available';
-const INVALID_PARAMETERS = 'Invalid parameters';
-
-export interface ResponseStorageIndexedDB {
-  func: string,
-  event: string;
-  data: any;
-}
-
-export interface IndexObj {
-  id?: string;
-  name?: string;
-  unique?: boolean;
-}
+const DATABASE_NOT_EXIST = 'Database not exist';
+const STORENAME_NOT_EXIST = 'Not exist object store';
+const REQUEST_UNAVAILABLE = 'Request unavailable';
 
 export abstract class IndexedDBStorage {
 
-  private nameDB!: string;
-  private versionDB!: number;
+  private indexedDB!: IDBFactory;
+  private databases!: Map<string, IDBSchema>;
 
-  constructor(
-    nameDB: string,
-    version: number
-  ) {
-    this.nameDB = nameDB;
-    this.versionDB = version;
+  constructor(databases: Map<string, IDBSchema>) {     
+    this.databases = databases;
+    this.initialize();  
   }
 
-  protected abstract transactionsMessages(func: string, event: string, data: any): void;
+  protected abstract eventsIndexedDB(event: string, dbName: string, storeName?: string, data?: any): void;
 
-  private handleSuccess(func: string, data: any) {
-    this.transactionsMessages(func, 'onSuccess', data);
+  /**
+   * Initialize factory indexedDB
+   */
+  private initialize() {
+    this.indexedDB =
+      window.indexedDB ||
+      (window as any).mozIndexedDB ||
+      (window as any).msIndexedDB ||
+      (window as any).webkitIndexedDB;
+
+    if (!indexedDB) throw new Error(NOT_AVAILABLE_DB);
+    this.createDatabases(this.databases);
   }
 
-  private handleError(func: string, data: any) {
-    this.transactionsMessages(func, 'onError', data);
+  /**
+  * Function to create databases
+  * @param databases 
+  */
+  private createDatabases(databases: Map<string, IDBSchema>) {  
+    if (!databases.size) throw new Error('Please, provide databases schema');     
+    databases.forEach(item => { 
+      this.eventsIndexedDB('creatingDatabase', item.dbName);
+      createDatabaseAndObjectsStore(this.indexedDB, item);
+      this.eventsIndexedDB('createdDatabase', item.dbName);
+    });
   }
 
-  private getConnection() {
-    const NAME_METHOD = this.getConnection.name;
-    const indexedDB = window.hasOwnProperty('indexedDB') && window.indexedDB ? window.indexedDB : null;
-    if (!indexedDB) {
-      this.handleError(NAME_METHOD, NOT_AVAILABLE_DB);
-      return;
-    };
-
-    const request = indexedDB.open(this.nameDB, this.versionDB);
-    request.onblocked = (e: any) => this.handleSuccess(NAME_METHOD, e);
-    request.onerror = (e: any) => this.handleError(NAME_METHOD, e);
-    return request;
+  /**
+   * Function to get connection from Map
+   * @param dbName 
+   * @returns IDBSchema
+   */
+  private getDatabase(dbName: string): IDBSchema {
+    return <IDBSchema>this.databases.get(dbName);        
   }
 
-  protected deleteBD() {
-    const NAME_METHOD = this.deleteBD.name;
-    const request = window.indexedDB.deleteDatabase(this.nameDB);
-    request.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e);
-  }
+  /**
+   * Function to delete connection
+   * @param dbName 
+   * @returns
+   */
+  protected deleteBD(dbName: string): Promise<any> {
+    const promise = new Promise<boolean>((resolve, reject) => {
+      const connection = <IDBSchema>this.getDatabase(dbName);
+      if (!connection) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
-  protected add(nameStore: string, data: any, { autoIncrement, indexes }: { autoIncrement: boolean, indexes: IndexObj[] } = { autoIncrement: true, indexes: [] }) {
-    const NAME_METHOD = this.add.name;
-    if (!nameStore || !data) {
-      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
-      return;
-    }
-
-    const request = this.getConnection();
-    request!.onsuccess = (event: any) => {
-      const db = event.target.result;
-      
-      if (db.objectStoreNames.contains(nameStore)) {
-        const tx = db.transaction(nameStore, 'readwrite');
-        const store = tx.objectStore(nameStore);      
-
-        let createRequest;
-        if (Array.isArray(data))
-          for (let item of data) createRequest = store.put(item);
-        else createRequest = store.put(data);
-
-        createRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-        createRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
+      const request = this.indexedDB.deleteDatabase(connection.dbName);
+      this.databases.delete(connection.dbName);
+      request.onsuccess = (e: any) => {
+        this.eventsIndexedDB('deleteBD', dbName);
+        resolve(true);
       }
-    }
-
-    request!.onupgradeneeded = (event: any) => {
-      const db = event.target.result;
-            
-      if (!db.objectStoreNames.contains(nameStore)) {
-        const store = db.createObjectStore(nameStore, { autoIncrement: autoIncrement });      
-
-        if (indexes?.length)
-          for (let item of indexes)
-            store.createIndex(item.id, item.name, { unique: item.unique });
-
-        let createRequest;
-        if (Array.isArray(data))
-          for (let item of data) createRequest = store.put(item);
-        else createRequest = store.put(data);
-
-        createRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-        createRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
-      }
-    }
+    });
+    return promise;
   }
 
-  protected get(nameStore: string, key: string | number, nameIndex?: string) {
-    const NAME_METHOD = this.get.name;
-    if (!nameStore || !key) {
-      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
-      return;
-    }
+  /**
+   * Function to add records to database
+   * @param dbName 
+   * @param storeName 
+   * @param data 
+   * @returns Promise
+   */
+  protected addItems(dbName: string, storeName: string, data: any): Promise<any> {
+    const promise = new Promise((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
-    const request = this.getConnection();
-    request!.onsuccess = (event: any) => {
-      const tx = event.target.result.transaction(nameStore, 'readonly');
-      const store = tx.objectStore(nameStore);
-      let request;
-      if (nameIndex) {
-        const index = store.index(nameIndex);
-        request = index.get(key);
-      } else request = store.get(key);
-      request.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-    }
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readwrite);
+          const store = tx.objectStore(storeName);
+
+          let request;
+          if (Array.isArray(data)) {
+            for (let item of data) {       
+              const pk = getPK(item);          
+              if (pk) request = store.put(item, pk);
+              else request = store.put(item);
+            }
+          } else {
+            const pk = getPK(data);
+            if (pk) request = store.put(data, pk);
+            else request = store.put(data);
+          }
+
+          if (!request) {
+            reject(REQUEST_UNAVAILABLE);
+            return;
+          }
+          request.onsuccess = (e: any) => {
+            this.eventsIndexedDB('addedItem', dbName, storeName, data);
+            resolve(e.target.result);
+          }
+          request.onerror = (e: any) => reject(e);
+        })
+        .catch((error: any) => reject(error));
+    });
+    return promise;
   }
 
-  protected getAll(nameStore: string, withKeys: boolean = false) {
-    const NAME_METHOD = this.getAll.name;
-    if (!nameStore) {
-      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
-      return;
-    }
+  /**
+   * Function to get data from database
+   * @param dbName 
+   * @param storeName 
+   * @param key 
+   * @param indexName 
+   * @returns Promise
+   */
+  protected getItem(dbName: string, storeName: string, key: string | number, indexName?: string): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
-    const request = this.getConnection();
-    request!.onsuccess = (event: any) => {
-      const data: any = [];
-      const tx = event.target.result.transaction(nameStore, 'readonly');
-      const store = tx.objectStore(nameStore);
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readonly);
+          const store = tx.objectStore(storeName);
 
-      if (withKeys) {
-        store.openCursor().onsuccess = (e: any) => {
-          const cursor = e.target.result;
-          if (cursor) {
-            data.push({ id: cursor.key, value: cursor.value });
-            cursor.continue();
+          let request;
+          if (indexName) {
+            const index = store.index(indexName);
+            request = index.get(key);
+          } else request = store.get(key);
+
+          request.onsuccess = (e: any) => resolve(e.target.result);
+          request.onerror = (e: any) => reject(e);
+        })
+        .catch((error: any) => reject(error));
+    });
+    return promise;
+  }
+
+  /**
+   * Function to get all data from store
+   * @param dbName 
+   * @param storeName 
+   * @param withKeys 
+   * @returns 
+   */
+  protected getAllItems(dbName: string, storeName: string, withKeys: boolean = false): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject([]);
+
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readonly);
+          const store = tx.objectStore(storeName);
+          const data: any = [];
+
+          if (withKeys) {
+            store.openCursor().onsuccess = (e: any) => {
+              const cursor = e.target.result;
+              if (cursor) {
+                data.push({ key: cursor.key, value: cursor.value });
+                cursor.continue();
+              } else resolve(data);
+            };
           } else
-            this.handleSuccess(NAME_METHOD, data);
-        };
-      } else
-        store.getAll().onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-      store.getAll().onerror = (e: any) => this.handleError(NAME_METHOD, e);
-    };
+            store.getAll().onsuccess = (e: any) => resolve(e.target.result);
+          store.getAll().onerror = (e: any) => reject(e);
+        })
+        .catch((error: any) => reject(error));
+    });
+    return promise;
   }
 
-  protected update(nameStore: string, key: string | number, newValue: any) {
-    const NAME_METHOD = this.update.name;
-    if (!nameStore || !key || !newValue) {
-      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
-      return;
-    }
+  /**
+   * Function to update record in store from database
+   * @param dbName 
+   * @param storeName 
+   * @param key 
+   * @param newValue 
+   * @returns 
+   */
+  protected updateItem(dbName: string, storeName: string, key: string | number, newValue: any): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
-    const request = this.getConnection();
-    request!.onsuccess = (event: any) => {
-      const tx = event.target.result.transaction(nameStore, 'readwrite');
-      const store = tx.objectStore(nameStore);
-      const updateRequest = store.put(newValue, key);
-      updateRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-      updateRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
-    }
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readwrite);
+          const store = tx.objectStore(storeName);
+          const request = store.put(newValue, key);
+          request.onsuccess = (e: any) => {
+            this.eventsIndexedDB('updatedItem', dbName, storeName, { key: key, newValue: newValue });
+            resolve(e.target.result);
+          }
+          request.onerror = (e: any) => reject(e);
+        })
+        .catch((error: any) => reject(error))
+    });
+    return promise;
   }
 
-  protected delete(nameStore: string, key: string | number) {
-    const NAME_METHOD = this.delete.name;
-    if (!nameStore || !key) {
-      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
-      return;
-    }
+  /**
+   * Function to delete record of store from database
+   * @param dbName 
+   * @param storeName 
+   * @param key 
+   * @returns 
+   */
+  protected deleteItem(dbName: string, storeName: string, key: string | number): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
-    const request = this.getConnection();
-    request!.onsuccess = (event: any) => {
-      const tx = event.target.result.transaction(nameStore, 'readwrite');
-      const deleteRequest = tx.objectStore(nameStore).delete(key);
-      deleteRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-      deleteRequest.onerror = (e: any) => this.handleError(NAME_METHOD, e);
-    }
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readwrite);
+          const store = tx.objectStore(storeName);
+          const request = store.delete(key);
+          request.onsuccess = (e: any) => {
+            this.eventsIndexedDB('deletedItem', dbName, storeName, key);
+            resolve(true);
+          }
+          request.onerror = (e: any) => reject(e);
+        })
+        .catch((error: any) => reject(error))
+    });
+    return promise;
   }
 
-  protected clearObjectStorage(nameStore: string) {
-    const NAME_METHOD = this.clearObjectStorage.name;
-    if (!nameStore) {
-      this.handleError(NAME_METHOD, INVALID_PARAMETERS);
-      return;
-    }
+  /**
+   * Function to count items of store
+   * @param dbName 
+   * @param storeName 
+   */
+  protected countItems(dbName: string, storeName: string): Promise<any> {
+    return new Promise<number>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
-    const request = this.getConnection();
-    request!.onsuccess = (event: any) => {
-      const tx = event.target.result.transaction(nameStore, 'readwrite');
-      const deleteRequest = tx.objectStore(nameStore).clear();
-      deleteRequest.onsuccess = (e: any) => this.handleSuccess(NAME_METHOD, e.target.result);
-      deleteRequest.onerror = (e: any)=> this.handleError(NAME_METHOD, e);
-    }    
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readonly);
+          const store = tx.objectStore(storeName);
+          const request: IDBRequest = store.count();
+          request.onsuccess = (e: any) => resolve(e.target.result);
+          request.onerror = (e: any) => reject(e);
+        })
+        .catch((error: any) => reject(error))
+    });
   }
+
+  /**
+   * Function to clear object storage
+   * @param dbName 
+   * @param storeName 
+   * @returns 
+   */
+  protected clearStore(dbName: string, storeName: string): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
+
+      connectDatabase(this.indexedDB, database)
+        .then((db: IDBDatabase) => {
+          if (!existStore(db, storeName)) reject(`${STORENAME_NOT_EXIST} ${storeName}`);
+          const tx = createTx(db, storeName, TXMode.readwrite);
+          const store = tx.objectStore(storeName);
+          store.clear();
+          tx.oncomplete = () => {
+            this.eventsIndexedDB('clearStore', dbName, storeName);
+            resolve(true);
+          }
+        })
+        .catch((error: any) => reject(error))
+    });
+    return promise;
+  }
+
+  /**
+   * Function to delete object storage
+   * @param dbName 
+   * @param storeName 
+   * @returns 
+   */
+  protected deleteObjectStore(dbName: string, storeName: string): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      const database = <IDBSchema>this.getDatabase(dbName);
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);    
+
+      deleteObjectStore(this.indexedDB, database, storeName)
+        .then((data) => {
+          this.eventsIndexedDB('deletedObjectStore', dbName, storeName);
+          resolve(data);
+        })
+        .catch((error: any) => reject(error));
+    });
+    return promise;
+  }  
+
 }

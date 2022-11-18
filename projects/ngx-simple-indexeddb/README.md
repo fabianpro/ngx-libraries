@@ -1,5 +1,7 @@
 # NGX-SIMPLE-INDEXEDDB
 
+## Version 2.0.0
+
 This library aims to give you one better way to implement IndexedDB in ***Angular*** and more easy
 
 ## Install
@@ -16,16 +18,39 @@ Add the module in your application inside on imports
 import { NgxSimpleIndexeddbModule } from  'ngx-simple-indexeddb';
 ....
 
+const databases = [
+  {
+    dbName: 'BD1', 
+    dbVersion: 5,
+    dbStoresMetaData: [{
+      store: 'languages',
+      storeConfig: { 
+        autoIncrement: false 
+      },
+      storeIndexes: [
+        { name: 'name', keyPath: 'name', options: { unique: false } }
+      ]
+    }, {
+      store: 'companies',
+      storeConfig: { 
+        autoIncrement: true 
+      },
+      storeIndexes: [
+        { name: 'name', keyPath: 'name', options: { unique: true } },
+        { name: 'antique', keyPath: 'antique', options: { unique: true } },
+      ]
+    }]
+  }
+];
+
+
 @NgModule({
 	declarations: [
 	...
 	],
 	imports: [
 		...,
-		NgxSimpleIndexeddbModule.forRoot({
-			dbName:  'NAME_DATABASE',
-			dbVersion:  5
-		}),
+		NgxSimpleIndexeddbModule.forRoot(databases),
 		...
 	]
 })
@@ -47,8 +72,8 @@ constructor(
 ...
 
 ngOnInit(): void {
-	/*All results will be emitted at this observable, you can apply your logic inside the this block subscription*/
-	this._sIDB.transactionsMessagesObs.subscribe(res => console.log(res));
+	/*This subscription listen events like save, update, delete, delete store, delete DB, you can apply your logic inside the this block subscription*/
+	this._sIDB.eventsIndexedObs.subscribe(res => console.log(res));
 }
 ```
 
@@ -59,137 +84,254 @@ Execute operation needed
 
 | Attribute |Type |Default | Description | Required |
 |-----------|-----|--------|-------------|----------|
-|storage|`string`||`Name of Object Storage`|true|
-|data|`any`||`Data to save`| true
-|indexes|`IndexObj`|Array<IndexObj>()|`List of indexes`| false
-|autoIncrement |`boolean`|true|`Set to indexedDB how to manage key of records`| false|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
+|data|`any`||`Data to save`| true |
 
 
-- ***Create record(s) without index***
+- ***Create record(s) with autoincrement true***
 ```
-this._sIDB.addItems('NAME_OBJ_STORE', {name: 'Person 1', age: 25});
+this._sIDB.addRecords('BD1', 'companies', {name: 'AWS', antique: 25})
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
-- ***Create record(s) with index***
+- ***Create record(s) with autoincrement false (is necessary add to each item pk attribute)***
 ```
-//With indexes
-
-const  indexes = [
-	{id:  'by_name', name:  'name', unique:  true},
-	{id:  'by_age', name:  'age', unique:  true}
-];
+//With pk
 const  data = [
-	{name:  'Person 1', age:  25}, 
-	{name:  'Person 2', age:  33}
+	{pk: 1, name:  'Java'}, 
+	{pk: 2, name:  'Dart'},
+	{pk: 3, name:  'C#'}
 ];
-this._sIDB.addItems('DB_EXAMPLE_INDEXED', data, indexes, true);
+this._sIDB.addItems('BD1', 'languages', data)
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
 #### getItem
 
 | Attribute |Type |Default | Description | Required |
 |-----------|-----|--------|-------------|----------|
-|storage|`string`||`Name of Object Storage`|true|
-|key|`string|number`||`Key object to find`| true
-|index|`string`||`Key Name index`| false|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
+|key|`string|number`||`Key object to find`| true|
+|indexName|`string`||`Key Name index`| false|
 
 - ***Get record without index***
 ```
-this._sIDB.getItem('NAME_OBJ_STORE', 2);
+this._sIDB.getRecord('BD1', 2)
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 - ***Get record with index***
 ```
-this._sIDB.getItem('NAME_OBJ_STORE', 'Person 1', 'by_name');
+this._sIDB.getItem('BD1', 'languages', 'AWS' 'name')
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
-#### getItems
+#### getRecords
 
 | Attribute |Type |Default | Description | Required |
 |-----------|-----|--------|-------------|----------|
-|storage|`string`||`Name of Object Storage`|true|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
 |withKeys|`boolean`|false|`If you set this attribute in true, the response of query will return the primary key of each object  and value`| false|
 
 - ***Get list records without primaryKey***
 ```
-this._sIDB.getItems('NAME_OBJ_STORE');
+this._sIDB.getRecords('BD1', 'languages')
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
 - ***Get list records with primaryKey***
 ```
-this._sIDB.getItems('NAME_OBJ_STORE', true);
+this._sIDB.getRecords('BD1', 'languages', true)
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
-#### updateItem
+#### updateRecord
 
 | Attribute |Type |Default | Description | Required |
 |-----------|-----|--------|-------------|----------|
-|storage|`string`||`Name of Object Storage`|true|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
 |key|`string|number`||`Key object to find`| true|
 |newValue|`any`||`Object to save`| true|
 
 - ***Update record***
 ```
-const  data = [{name:  'Person 3', age:  26}];
-this._sIDB.updateItem('NAME_OBJ_STORE', 'Person 1', data);
+const data = {pk: 3, name: 'Rust'};
+this._sIDB.updateRecord('BD1', 'languages', 3, data)
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
-#### deleteItem
+#### deleteRecord
 
 | Attribute |Type |Default | Description | Required |
 |-----------|-----|--------|-------------|----------|
-|storage|`string`||`Name of Object Storage`|true|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
 |key|`string|number`||`Key object to delete`| true|
 
 - ***Delete record***
 ```
-this._sIDB.deleteItem('NAME_OBJ_STORE', 2);
+this._sIDB.deleteRecord('BD1', 'languages', 2
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
-#### clearObjStorage
+#### countRecords
 
 | Attribute |Type |Default | Description | Required |
 |-----------|-----|--------|-------------|----------|
-|storage|`string`||`Name of Object Storage`|true|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
 
-- ***Delete object storage***
+- ***Delete record***
 ```
-this._sIDB.clearObjStorage('NAME_OBJ_STORE');
+this._sIDB.countRecords('BD1', 'languages')
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
+```
+
+#### clearObjStore
+
+| Attribute |Type |Default | Description | Required |
+|-----------|-----|--------|-------------|----------|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
+
+- ***Delete object store***
+```
+this._sIDB.clearObjStore('BD1', 'languages')
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
+```
+
+#### deleteObjStore
+
+| Attribute |Type |Default | Description | Required |
+|-----------|-----|--------|-------------|----------|
+|database|`string`||`Name of Database`|true|
+|storeName|`string`||`Name of Object Store`|true|
+
+- ***Delete object store***
+```
+this._sIDB.deleteObjStore('BD1', 'companies')
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
 #### removeDB
+
+| Attribute |Type |Default | Description | Required |
+|-----------|-----|--------|-------------|----------|
+|database|`string`||`Name of Database`|true|
+
+- ***Remove database***
 ```
-this._sIDB.removeDB();
+this._sIDB.removeDB(database)
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
 ```
 
-## Catalog Objects
 
-This interface contain the data structure when observable emit data:
-**ResponseStorageIndexedDB**  
+## Catalog Objects and Interfaces
 
-| Attribute |Type |Description |
-|-----------|-----|------------|
-|func |`string`|`Name of function or operation that was called `|
-|event |`string`|`Emitted result of execution, just there are two events: onSuccess, onError`|
-|data |`any` |`Emitted data result of execution`|
+This **interface** contain the data structure when observable emit data:
+**ResponseStoreIndexedDB**  
 
-This interface contain the structure when you needed add to store indexes
+| Attribute |Type |Description |Required |
+|-----------|-----|------------|------------|
+|event |`string`|`Emitted event executed`|true|
+|dbName |`string`|`Name of database`|true|
+|storeName |`string`|`Name of store`|false|
+|data |`any` |`Emitted data result of execution`|false|
+
+
+This **class** contain the main structure to build database
+**IDBSchema**
+
+| Attribute |Type |Description |Required |
+|-----------|-----|------------|------------|
+|dbName|`string`|`Name database`|true|
+|dbVersion |`number`|`Number version`|false|
+|dbStoresMetaData |`Array<StoreMetaDataConfig>` |`Contains config stores`|true|
+
+
+This **class** contain the structure of store
+**StoreMetaDataConfig**
+
+| Attribute |Type |Description |Required |
+|-----------|-----|------------|------------|
+|store|`string`|`Name store`|true|
+|storeConfig |`StoreConfig`|`Config store`|true|
+|storeIndexes |`Array<IndexObj>` |`Contains indexes of stores`|false|
+
+
+This **interface** contain the structure of store
+**StoreConfig**
+
+| Attribute |Type |Description |Required |
+|-----------|-----|------------|------------|
+|keyPath|`string`|`Name key path`|false|
+|autoIncrement |`boolean`|`Set if key is autoincrement`|true|
+
+
+This **interface** contain the structure when you needed add to store indexes
 **IndexObj**
 
-| Attribute |Type |Description |
-|-----------|-----|------------|
-|id|`string`|`Id index`|
-|name |`string`|`Name of key path`|
-|unique |`boolean` |`Set to IndexedDB that the value is unique`|
+| Attribute |Type |Description |Required |
+|-----------|-----|------------|------------|
+|id|`string`|`Id index`|true|
+|keyPath |`string`|`Name of key path`|true|
+|options |`OptionsIndex` |`Set options index`|true|
 
 
-## UML diagram
+This **interface** contain the structure of options to each index
+**OptionsIndex**
 
-This sequence diagram try to show data flow of library:
-
-```mermaid
-sequenceDiagram
-NgxSimpleIndexeddbService->> Abstract class: Method(Data)
-Abstract class-->>IndexedDB: 
-IndexedDB->> Abstract class: Response
-Abstract class->> NgxSimpleIndexeddbService: transactionsMessages(Response)
-```
+| Attribute |Type |Description |Required |
+|-----------|-----|------------|------------|
+|unique|`boolean`|`Set if data is unique`|true|
