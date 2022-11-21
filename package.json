@@ -4,10 +4,12 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "start:ngx-sample-indexeddb": "ng serve --project ngx-sample-app",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",    
+    "buildProdNGXSIDB": "ng build --project ngx-simple-indexeddb --configuration production",
     "publishNGXSIDB": "cd dist/ngx-simple-indexeddb/ && npm publish"
   },
   "private": true,

@@ -129,4 +129,36 @@ export class AppComponent {
       });
   }
 
+  createNewDatabase() {
+    const database = {
+      dbName: 'BD2', 
+      dbVersion: 5,
+      dbStoresMetaData: [{
+        store: 'cars',
+        storeConfig: { 
+          autoIncrement: true 
+        },
+        storeIndexes: [
+          { name: 'name', keyPath: 'name', options: { unique: false } }
+        ]
+      }]
+    };
+
+    this._sIDB.addDatabase(database)
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
+  exportDatase() {
+    this._sIDB.exportToJSON('BD1') //, 'companies', true
+      .subscribe({
+        next: (data) => this.response = data,
+        error: (error) => this.response = error,
+        complete: () => this.loading = false
+      });
+  }
+
 }

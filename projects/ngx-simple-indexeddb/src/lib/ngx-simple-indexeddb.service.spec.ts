@@ -134,6 +134,27 @@ describe('NgxSimpleIndexeddbService', () => {
     });
   });
 
+  it('should add new database BD2', (done) => {
+    const database = {
+      dbName: 'BD2', 
+      dbVersion: 5,
+      dbStoresMetaData: [{
+        store: 'cars',
+        storeConfig: { 
+          autoIncrement: true 
+        },
+        storeIndexes: [
+          { name: 'name', keyPath: 'name', options: { unique: false } }
+        ]
+      }]
+    };
+
+    service.addDatabase(database).subscribe(data => {
+      expect(data).toBeTruthy();
+      done();
+    });
+  });
+
   /*it('should delete storage companies', (done) => {
     service.deleteObjStore(database.dbName, 'animals').subscribe(data => {
       expect(data).toBeTruthy();      

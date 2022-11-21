@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
+import { exportDatabaseToJSON } from '../utils/database';
 import { IDBSchema, ResponseStoreIndexedDB, SCHEMA_TOKEN } from './indexdb-meta-models';
 import { IndexedDBStorage } from './indexdb-storage';
 
@@ -9,31 +10,31 @@ import { IndexedDBStorage } from './indexdb-storage';
 export class NgxSimpleIndexeddbService extends IndexedDBStorage {
 
   private subject = new Subject<ResponseStoreIndexedDB>();
-  
+
   constructor(
     @Inject(SCHEMA_TOKEN) databases: IDBSchema[]
   ) {
-    if (!databases.length) 
+    if (!databases.length)
       throw new Error('Please, provide databases schema');
 
-    const map = new Map<string, IDBSchema>(); 
-    for (let item of databases) 
-      map.set(item.dbName, item);    
+    const map = new Map<string, IDBSchema>();
+    for (let item of databases)
+      map.set(item.dbName, item);
     super(map);
   }
 
   get eventsIndexedObs(): Observable<ResponseStoreIndexedDB> {
     return this.subject.asObservable();
   }
- 
+
   eventsIndexedDB(event: string, dbName: string, storeName?: string, data?: any): void {
     if (!this.subject) return;
-    this.subject.next({      
-			event: event,
-			dbName: dbName,
+    this.subject.next({
+      event: event,
+      dbName: dbName,
       storeName: storeName,
       data: data
-		});
+    });
     this.subject.complete();
   }
 
@@ -54,8 +55,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    });    
+        });
+    });
   }
 
   /**
@@ -66,7 +67,7 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
    * @param indexName 
    * @returns 
    */
-  getRecord(database: string, storeName: string, key: string | number, indexName?: string): Observable<any> {    
+  getRecord(database: string, storeName: string, key: string | number, indexName?: string): Observable<any> {
     return new Observable<any>((obs) => {
       this.getItem(database, storeName, key, indexName)
         .then(data => {
@@ -76,8 +77,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    });  
+        });
+    });
   }
 
   /**
@@ -97,8 +98,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    }); 
+        });
+    });
   }
 
   /**
@@ -109,7 +110,7 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
    * @param newValue 
    * @returns 
    */
-  updateRecord(database: string, storeName: string, key: string | number, newValue: any): Observable<any> {    
+  updateRecord(database: string, storeName: string, key: string | number, newValue: any): Observable<any> {
     return new Observable<any>((obs) => {
       this.updateItem(database, storeName, key, newValue)
         .then(data => {
@@ -119,8 +120,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    }); 
+        });
+    });
   }
 
   /**
@@ -130,7 +131,7 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
    * @param key 
    * @returns 
    */
-  deleteRecord(database: string, storeName: string, key: string | number): Observable<any> {  
+  deleteRecord(database: string, storeName: string, key: string | number): Observable<any> {
     return new Observable<any>((obs) => {
       this.deleteItem(database, storeName, key)
         .then(data => {
@@ -140,8 +141,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    }); 
+        });
+    });
   }
 
   /**
@@ -150,7 +151,7 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
    * @param storeName 
    * @returns 
    */
-  countRecords(database: string, storeName: string): Observable<number>{    
+  countRecords(database: string, storeName: string): Observable<number> {
     return new Observable<any>((obs) => {
       this.countItems(database, storeName)
         .then(data => {
@@ -160,8 +161,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    }); 
+        });
+    });
   }
 
   /**
@@ -180,8 +181,8 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    }); 
+        });
+    });
   }
 
   /**
@@ -200,7 +201,7 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });      
+        });
     });
   }
 
@@ -219,7 +220,47 @@ export class NgxSimpleIndexeddbService extends IndexedDBStorage {
         .catch(err => {
           obs.error(err);
           obs.complete();
-        });  
-    }); 
+        });
+    });
+  }
+
+  /**
+   * Create new database
+   * @param database
+   */
+  addDatabase(database: IDBSchema): Observable<boolean> {
+    return new Observable<any>((obs) => {
+      this.createDatabase(database)
+        .then(data => {
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });
+    });
+  }
+
+  /**
+   * Export database or table
+   * @param database 
+   * @param storeName 
+   * @param withKeys 
+   * @returns 
+   */
+  exportToJSON(database: string, storeName?: string, withKeys: boolean = false): Observable<boolean> {
+    return new Observable<any>((obs) => {
+      this.exportDatabase(database, storeName, withKeys)
+        .then(data => {
+          exportDatabaseToJSON(data);
+          obs.next(data);
+          obs.complete();
+        })
+        .catch(err => {
+          obs.error(err);
+          obs.complete();
+        });
+    });
   }
 }

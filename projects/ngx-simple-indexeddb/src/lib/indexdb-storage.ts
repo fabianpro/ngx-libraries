@@ -12,9 +12,9 @@ export abstract class IndexedDBStorage {
   private indexedDB!: IDBFactory;
   private databases!: Map<string, IDBSchema>;
 
-  constructor(databases: Map<string, IDBSchema>) {     
+  constructor(databases: Map<string, IDBSchema>) {
     this.databases = databases;
-    this.initialize();  
+    this.initialize();
   }
 
   protected abstract eventsIndexedDB(event: string, dbName: string, storeName?: string, data?: any): void;
@@ -37,12 +37,11 @@ export abstract class IndexedDBStorage {
   * Function to create databases
   * @param databases 
   */
-  private createDatabases(databases: Map<string, IDBSchema>) {  
-    if (!databases.size) throw new Error('Please, provide databases schema');     
-    databases.forEach(item => { 
-      this.eventsIndexedDB('creatingDatabase', item.dbName);
-      createDatabaseAndObjectsStore(this.indexedDB, item);
+  private createDatabases(databases: Map<string, IDBSchema>) {
+    if (!databases.size) throw new Error('Please, provide databases schema');
+    databases.forEach(item => {
       this.eventsIndexedDB('createdDatabase', item.dbName);
+      createDatabaseAndObjectsStore(this.indexedDB, item);
     });
   }
 
@@ -52,7 +51,7 @@ export abstract class IndexedDBStorage {
    * @returns IDBSchema
    */
   private getDatabase(dbName: string): IDBSchema {
-    return <IDBSchema>this.databases.get(dbName);        
+    return <IDBSchema>this.databases.get(dbName);
   }
 
   /**
@@ -94,16 +93,11 @@ export abstract class IndexedDBStorage {
           const store = tx.objectStore(storeName);
 
           let request;
-          if (Array.isArray(data)) {
-            for (let item of data) {       
-              const pk = getPK(item);          
-              if (pk) request = store.put(item, pk);
-              else request = store.put(item);
-            }
-          } else {
-            const pk = getPK(data);
-            if (pk) request = store.put(data, pk);
-            else request = store.put(data);
+          const arr = Array.isArray(data) ? data : [data];
+          for (let item of arr) {
+            const pk = getPK(item);
+            if (pk) request = store.put(item, pk);
+            else request = store.put(item);
           }
 
           if (!request) {
@@ -161,7 +155,7 @@ export abstract class IndexedDBStorage {
    * @param withKeys 
    * @returns 
    */
-  protected getAllItems(dbName: string, storeName: string, withKeys: boolean = false): Promise<any> {
+  protected getAllItems(dbName: string, storeName: string, withKeys: boolean = false, withStoreName: boolean = false): Promise<any> {
     const promise = new Promise<any>((resolve, reject) => {
       const database = <IDBSchema>this.getDatabase(dbName);
       if (!database) reject([]);
@@ -179,10 +173,16 @@ export abstract class IndexedDBStorage {
               if (cursor) {
                 data.push({ key: cursor.key, value: cursor.value });
                 cursor.continue();
-              } else resolve(data);
+              } else {
+                if (withStoreName) resolve({ store: storeName, data: data });
+                else resolve(data);
+              }
             };
           } else
-            store.getAll().onsuccess = (e: any) => resolve(e.target.result);
+            store.getAll().onsuccess = (e: any) => {
+              if (withStoreName) resolve({ store: storeName, data: e.target.result });
+              else resolve(e.target.result);
+            }
           store.getAll().onerror = (e: any) => reject(e);
         })
         .catch((error: any) => reject(error));
@@ -308,7 +308,7 @@ export abstract class IndexedDBStorage {
   protected deleteObjectStore(dbName: string, storeName: string): Promise<any> {
     const promise = new Promise<any>((resolve, reject) => {
       const database = <IDBSchema>this.getDatabase(dbName);
-      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);    
+      if (!database) reject(`${DATABASE_NOT_EXIST} ${dbName}`);
 
       deleteObjectStore(this.indexedDB, database, storeName)
         .then((data) => {
@@ -318,6 +318,51 @@ export abstract class IndexedDBStorage {
         .catch((error: any) => reject(error));
     });
     return promise;
-  }  
+  }
+
+  /**
+   * Function to create new database inline
+   * @param database 
+   * @returns 
+   */
+  protected createDatabase(database: IDBSchema): Promise<boolean> {
+    const promise = new Promise<any>((resolve, reject) => {
+      if (!database) reject(false);
+      this.eventsIndexedDB('createdDatabase', database.dbName);
+      this.databases.set(database.dbName, database);
+      createDatabaseAndObjectsStore(this.indexedDB, database);
+      resolve(true);
+    });
+    return promise;
+  }
+
+  /**
+   * Function to export database or table of database
+   * @param dbName 
+   * @param storeName 
+   * @param withKeys 
+   * @returns 
+   */
+  protected exportDatabase(dbName: string, storeName?: string, withKeys: boolean = false): Promise<any> {
+    const promise = new Promise<any>((resolve, reject) => {
+      if (storeName)
+        this.getAllItems(dbName, storeName, withKeys).then(data => resolve({ store: storeName, data: data }));
+      else {
+        const dataExport: any[][] = [];
+        const promises: any = [];        
+        const database = <IDBSchema>this.getDatabase(dbName);
+        if (!database) reject([]);
+
+        database.dbStoresMetaData.forEach(item =>
+          promises.push(this.getAllItems(dbName, item.store, withKeys, true)));
+        Promise.all(promises).then(data => {
+          dataExport.push(data);
+          resolve(dataExport);
+        });
+      }
+      this.eventsIndexedDB('exportedDatabase', dbName, storeName);
+    });
+    return promise;
+  }
 
 }
