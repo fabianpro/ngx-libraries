@@ -1,8 +1,14 @@
 # NGX-SIMPLE-INDEXEDDB
 
-## Version 2.0.0
-
 This library aims to give you one better way to implement IndexedDB in ***Angular*** and more easy
+
+## Version 2.0.2
+
+- Was optimized code
+- Added new features
+  - Now you can create database after initialize
+  - Now you can export database or just one table
+
 
 ## Install
 ```
@@ -149,7 +155,7 @@ this._sIDB.getItem('BD1', 'languages', 'AWS' 'name')
 |-----------|-----|--------|-------------|----------|
 |database|`string`||`Name of Database`|true|
 |storeName|`string`||`Name of Object Store`|true|
-|withKeys|`boolean`|false|`If you set this attribute in true, the response of query will return the primary key of each object  and value`| false|
+|withKeys|`boolean`|false|`If you set this attribute in true, the response of query will return the primary key of each object and value`| false|
 
 - ***Get list records without primaryKey***
 ```
@@ -275,6 +281,55 @@ this._sIDB.removeDB(database)
         complete: () => console.log("Complete")
       });
 ```
+
+#### addDatabase
+
+| Attribute |Type |Default | Description | Required |
+|-----------|-----|--------|-------------|----------|
+|database|`IDBSchema`||`Schema of new database`|true|
+
+- ***Create database***
+```
+const newDatabase = {
+  dbName: 'BD2', 
+  dbVersion: 5,
+  dbStoresMetaData: [{
+    store: 'cars',
+    storeConfig: { 
+      autoIncrement: true 
+    },
+    storeIndexes: [
+      { name: 'name', keyPath: 'name', options: { unique: false } }
+    ]
+  }]
+};
+
+this._sIDB.addDatabase(newDatabase)
+    .subscribe({
+        next: (data) => console.log(data),  
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
+```
+
+#### exportToJSON
+
+| Attribute |Type |Default | Description | Required |
+|-----------|-----|--------|-------------|----------|
+|database|`string`||`Name of database`|true|
+|storeName|`string`||`Name of Object Store`|false|
+|withKeys|`boolean`|false|`If you set this attribute in true, the response of query will return the primary key of each object and value`| false|
+
+- ***Export database or table***
+```
+this._sIDB.exportToJSONDatabase(newDatabase)
+    .subscribe({
+        next: (data) => console.log(data), //Observable return data exported
+        error: (error) => console.error(error),
+        complete: () => console.log("Complete")
+      });
+```
+
 
 
 ## Catalog Objects and Interfaces

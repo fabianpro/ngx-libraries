@@ -85,7 +85,7 @@ export function deleteObjectStore(indexedDB: IDBFactory, database: IDBSchema, st
           resolve(true);
         };
         request.onerror = (e: Event) => reject(e);
-      });      
+      });
     } catch (error) {
       reject(error);
     }
@@ -99,11 +99,34 @@ export function deleteObjectStore(indexedDB: IDBFactory, database: IDBSchema, st
  */
 export function validateDatabase(database: IDBSchema): Promise<IDBSchema> {
   return new Promise<IDBSchema>((resolve) => {
-    connectDatabase(indexedDB, database).then((db) => { 
+    connectDatabase(indexedDB, database).then((db) => {
       if (!database.hasOwnProperty('dbVersion') || !database.dbVersion) {
         database.dbVersion = db.version;
         resolve(database);
       }
-    });   
-  });  
+    });
+  });
+}
+
+/**
+ * Function to export database in json file
+ * @param jsonData 
+ * @param fileName 
+ * @returns 
+ */
+export function exportDatabaseToJSON(jsonData: any, fileName?: string): Promise<boolean> {
+  return new Promise<boolean>((resolve, reject) => {
+    try {
+      const data = JSON.stringify(jsonData);
+      const uri = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
+      const fileNameExport = fileName ?? 'indexeddb-exported.json';
+      const el = document.createElement('a');
+      el.setAttribute('href', uri);
+      el.setAttribute('download', fileNameExport);
+      el.click();
+      resolve(true);
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
