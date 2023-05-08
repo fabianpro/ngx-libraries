@@ -1,7 +1,7 @@
 {
   "name": "ngx-simple-indexeddb",
   "version": "2.0.2",
-  "license": "ISC",
+  "license": "MIT",
   "private": false,
   "description": "Easy way to implement Indexeddb",
   "keywords": ["indexedb", "indexed", "storage", "browser storage", "localstorage", "db", "ng", "ngx", "scheme"],

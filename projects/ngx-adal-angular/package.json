@@ -1,0 +1,31 @@
+{
+  "name": "ngx-adal-angular",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": false,
+  "description": "It is a easy way to implement microsoft adal authentication, it was taken of microsoft-adal-angular6 and compiled in Angular 14 to implement with higher versions to 7",
+  "keywords": [
+    "adal",
+    "angular",
+    "adal angular",
+    "azure active directory",
+    "AAD authentication"
+  ],
+  "author": {
+    "name": "Fabian Huerfano",
+    "email": "fabianpro178@gmail.com"    
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fabianpro/ngx-libraries"
+  },
+  "peerDependencies": {
+    "@angular/common": "^14.2.0",
+    "@angular/core": "^14.2.0",
+    "@types/adal": "^1.0.29",
+    "adal-angular": "^1.0.18"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"    
+  }
+}

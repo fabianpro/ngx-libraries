@@ -12,6 +12,9 @@
     "noFallthroughCasesInSwitch": true,
     "sourceMap": true,
     "paths": {
+      "ngx-adal-angular": [
+        "dist/ngx-adal-angular"
+      ],
       "ngx-simple-indexeddb": [
         "dist/ngx-simple-indexeddb"
       ]

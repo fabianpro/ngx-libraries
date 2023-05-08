@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { NgxAdalAngularService } from 'projects/ngx-adal-angular/src/public-api';
 import { NgxSimpleIndexeddbService } from 'projects/ngx-simple-indexeddb/src/public-api';
 
 @Component({
@@ -13,10 +14,13 @@ export class AppComponent {
   loading: boolean = false;
 
   constructor(
-    private _sIDB: NgxSimpleIndexeddbService
+    private _sIDB: NgxSimpleIndexeddbService,
+    private adalSvc: NgxAdalAngularService
   ) { }
 
   ngOnInit(): void {
+    console.log("OnInit");
+    //this.adalSvc.login();
     this._sIDB.eventsIndexedObs.subscribe(res => console.log(res));
   }
   
